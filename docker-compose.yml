@@ -1,25 +1,27 @@
-version: '3'
+version: '3.8'
 
 services:
+
   prometheus:
     image: prom/prometheus:v2.30.3
     restart: unless-stopped
     ports:
-      - 9000:9090
+      - "9000:9090"
     volumes:
       - ./prometheus:/etc/prometheus
       - prometheus-data:/prometheus
-    command: --web.enable-lifecycle  --config.file=/etc/prometheus/prometheus.yml
-
+    command:
+      - --web.enable-lifecycle
+      - --config.file=/etc/prometheus/prometheus.yml
 
   grafana:
     image: grafana/grafana:8.2.2
-    ports:
-      - 3000:3000
     restart: unless-stopped
+    ports:
+      - "3000:3000"
     volumes:
-      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
       - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
 
   alertmanager:
     image: prom/alertmanager:v0.23.0
@@ -27,46 +29,62 @@ services:
     ports:
       - "9093:9093"
     volumes:
-      - "./alertmanager:/config"
+      - ./alertmanager:/config
       - alertmanager-data:/data
-    command: --config.file=/config/alertmanager.yml --log.level=debug 
-
-  loki:
-    image: grafana/loki:2.4.1
-    ports:
-      - "3100:3100"
-    command: -config.file=/etc/loki/local-config.yaml
-
-  promtail:
-    image: grafana/promtail:2.4.1
-    volumes:
-      - /var/log:/var/log
-    command: -config.file=/etc/promtail/config.yml
-
-
-  #prom2teams:
-  #  image: idealista/prom2teams:3.2.3
-  #  restart: unless-stopped
-  #  environment:
-  #    PROM2TEAMS_CONNECTOR: "https://og2gether.webhook.office.com/webhookb2/b5370781-89c2-45ba-be14-453e29dfb0a9@8794e153-c3bd-4479-8bea-61aeaf167d5a/IncomingWebhook/57e69e8f10dd49ce8dae3b816159e228/4eb361c9-e566-4b66-ab30-bed630f495a5"
-  #  ports:
-  #    - 8089:8089
+    command:
+      - --config.file=/config/alertmanager.yml
+      - --log.level=debug
 
   loki:
     image: grafana/loki:2.4.2
-    ports:
-      - 3100:3100
-    command: -config.file=/etc/loki/local-config.yaml
     restart: unless-stopped
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/loki-config.yaml
     volumes:
       - loki-data:/data
+      - ./loki:/etc/loki
 
+  blackbox-exporter:
+    image: prom/blackbox-exporter:latest
+    restart: unless-stopped
+    ports:
+      - "9115:9115"
+    volumes:
+      - ./blackbox:/etc/blackbox
+      - blackbox-data:/data
+    command:
+      - --config.file=/etc/blackbox/blackbox.yml
+
+  grafana-oncall:
+    image: grafana/oncall:latest
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - oncall-data:/var/lib/oncall
+    environment:
+      BASE_URL: http://localhost:8080
+      SECRET_KEY: oncallsecret
+      DATABASE_TYPE: sqlite3
+      DATABASE_PATH: /var/lib/oncall/oncall.db
+      BROKER_TYPE: redis
+      REDIS_URI: redis://redis:6379/0
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:6
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
 
 volumes:
   prometheus-data:
-
   grafana-data:
-
   alertmanager-data:
-
   loki-data:
+  promtail-data:
+  blackbox-data:
+  oncall-data:
+  redis-data:
